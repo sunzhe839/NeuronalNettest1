@@ -13,6 +13,8 @@ Times=60000
 x=numpy.zeros((Times,N))
 y=numpy.zeros((Times,N))
 z=numpy.zeros((Times,N))
+po=numpy.zeros((Times,N))
+AP=numpy.zeros((Times,N))
 
 
 def SmallWorld():
@@ -47,7 +49,9 @@ def HRmod(dna,x,y,z,nn,Is,dt):
     xn=x+(y-a*x**3+b*x**2-z+nn+Is)*dt
     yn=y+(c-d*x**2-y)*dt
     zn=z+r*(s*(x-xhi)-z)*dt
-    return xn,yn,zn
+    if xn>20: ap=True
+    if xn<=20: ap=False
+    return xn,yn,zn,ap
 
 def noise():
     return 0
@@ -61,9 +65,10 @@ def inpSig(ts,i):
             aij=NetMatrix[i,j]
             #print i,j
             #print aij
-            xji=-(x[ts,j]-x[ts,i])
+            xji=(x[ts,i]-x[ts,j])
             pot=pot+aij*xji
-            #print ts,i,j,aij,xji,pot           
+            #print ts,i,j,aij,xji,pot
+    po[ts,i]=pot           
     return pot
 
 ########### MAIN ###################
@@ -79,17 +84,19 @@ if __name__ == '__main__':
         for i in range(N):                
             nn=noise()
             Is=g*inpSig(ts,i)
-            if i==0 and ts==0:
-                Is=-3
+            if i==0:
+                Is=3
             #print ts,i,Is
             #print Is
-            
-            x[ts+1,i],y[ts+1,i],z[ts+1,i]=HRmod(dna,x[ts,i],y[ts,i],z[ts,i],nn,Is,dt)      
-            #print(x[ts+1,i],ts,i)#print m
+            #print(x[ts+1,i],ts,i,AP.shape)#print m
+            x[ts+1,i],y[ts+1,i],z[ts+1,i],AP[ts+1,i]=HRmod(dna,x[ts,i],y[ts,i],z[ts,i],nn,Is,dt)      
+
     
     ##### PLOTTING ####
     for i in range(N):
-        plt.subplot(N,1,i)       
+        plt.subplot(N,1,i+1)       
         plt.plot(x[:,i])
+        #plt.figure(1)
+        #plt.pcolor(AP)
     plt.show()
     
