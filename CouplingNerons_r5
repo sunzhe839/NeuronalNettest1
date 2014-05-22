@@ -1,0 +1,130 @@
+import networkx as nx
+import matplotlib.pyplot as plt
+import numpy as np
+from mayavi import mlab
+import random
+
+p=0.4;N=6;k=1
+NetMatrix=np.zeros((N,N))
+Times=60000
+x=np.zeros((Times,N))
+y=np.zeros((Times,N))
+z=np.zeros((Times,N))
+po=np.zeros((Times,N))
+AP=np.zeros((Times,N),dtype="bool")
+
+def newman_watts_smallworld(n, k, p):
+    """Return a Newman-Watts-Strogatz small world graph.
+
+    Parameters
+    ----------
+    n : int
+        The number of nodes
+    k : int
+        Each node is connected to k nearest neighbors in ring topology
+    p : float
+        The probability of adding a new edge for each edge
+"""
+    if k>=n:
+        raise nx.NetworkXError("k>=n, choose smaller k or larger n")
+    G=nx.empty_graph(n)
+    G.name="newman_watts_smallworld%s,%s,%s)"%(n,k,p)
+    nlist = G.nodes()
+    fromv = nlist
+    #print fromv
+    # connect the 2*k neighbors
+    for j in range(1, k+1):
+        tov = fromv[j:] + fromv[0:j] # the first j are now last
+        for i in range(len(fromv)):
+            G.add_edge(fromv[i], tov[i])
+    # for each edge u-v, with probability p, randomly select existing
+    # node w and add new edge u-w
+    e = G.edges()
+    for (u, v) in e:
+        if random.random() < p:
+            w = random.choice(nlist)
+            # no self-loops and reject if edge u-w exists
+            # is that the correct NWS model?
+            while w == u or G.has_edge(u, w):
+                w = random.choice(nlist)
+                if G.degree(u) >= n-1:
+                    break # skip this rewiring
+            else:
+                G.add_edge(u,w)
+    return G
+def act(Ap):
+    # AP[time,Neuron]
+    mp=0
+    for i in range(N):
+        mp=mp+Ap[i]
+    return mp    
+    
+def HRmod(dna,x,y,z,nn,Is,dt):
+    a=dna[0];b=dna[1];c=dna[2];d=dna[3];s=dna[4];r=dna[5];xhi=dna[6];
+    xn=x+(y-a*x**3+b*x**2-z+nn+Is)*dt
+    yn=y+(c-d*x**2-y)*dt
+    zn=z+r*(s*(x-xhi)-z)*dt
+    if xn>0.8: 
+        ap=True
+        #print ap
+    else: 
+        ap=False
+    return xn,yn,zn,ap
+
+def noise(sigma,mu):
+    return mu+sigma*np.random.randn()
+    
+def inpSig(ts,i):
+    pot =0
+    if ts==0:
+        return 0
+    else:
+        for j in range(N):
+            aij=NetMatrix[i,j]
+            #print i,j
+            #print aij
+            xji=(x[ts,i]-x[ts,j])
+            pot=pot+aij*xji
+            #print ts,i,j,aij,xji,pot
+    po[ts,i]=pot           
+    return pot
+
+if __name__ == '__main__':
+    SmallworldG=newman_watts_smallworld(N,k,p)
+    NetMatrix=nx.adjacency_matrix(SmallworldG) #small world matrix
+    dna=(1,3,1,5,4,0.006,-1.6)
+    #print NetMatrix
+    I=3;dt=0.01
+    sigma=1;mu=1;
+    x[0]=0.3;y[0]=0.3;z[0]=3;g=1
+    for ts in range(Times-1):
+        for i in range(N):                
+            nn=noise(sigma,mu)
+            Is=g*inpSig(ts,i)
+            if ts==0 and i==0:
+                Is=3
+            #print ts,i,Is
+            #print Is
+            #print(x[ts+1,i],ts,i,AP.shape)#print m
+            x[ts+1,i],y[ts+1,i],z[ts+1,i],AP[ts+1,i]=HRmod(dna,x[ts,i],y[ts,i],z[ts,i],nn,Is,dt)          
+            #print AP[ts+1,i]
+    
+    ### MP CALCULATION #####
+    MP=np.zeros((0))
+    for t in range(Times):
+        val=act(x[t,:])
+        MP=np.append(MP,val)
+    
+    
+    ##### PLOTTING ####
+    #print(np.shape(AP))
+    #plt.plot(AP[:,1]);plt.show()
+    
+    
+    ax1=plt.subplot(1,1,1)
+    plt.pcolor(np.transpose(AP),cmap="Greys")
+    plt.figure(2)
+    plt.plot(MP,'.')
+    plt.show()
+
+    
